@@ -20,7 +20,7 @@ func main() {
 			read, _ := tcp.Read(bytes)
 			fmt.Println(string(bytes[0:read]))
 			count++
-			//time.Sleep(1 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}()
 	server := znet.NewServer("zinx-copy")

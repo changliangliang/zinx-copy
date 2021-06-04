@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"zinx-copy/ziface"
@@ -19,6 +20,17 @@ type Server struct {
 
 	// 服务器监听的端口
 	Port int
+}
+
+// CallBackToClient 当前回调是写死的，以后应该有用户自定义
+func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
+	fmt.Println("[Conn Handle] CallBackToClient...]")
+	if _, err := conn.Write(data[0:len]); err != nil {
+		fmt.Println("write back buf err:", err)
+		return errors.New("CallBackToClient error")
+	}
+	return nil
+
 }
 
 func NewServer(name string) ziface.IServer {
@@ -49,27 +61,17 @@ func (s Server) Start() {
 		}
 		fmt.Println("start Zinx server succ, ", s.Name, " succ, Listening..")
 
+		var cid uint32
+		cid = 0
 		for {
 			conn, err := TCPListener.AcceptTCP()
 			if err != nil {
 				fmt.Println("Accept err:", err)
 				continue
 			}
-			go func() {
-				for {
-					buf := make([]byte, 512)
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("recv buf err:", err)
-						continue
-					}
-					if _, err := conn.Write(buf[:cnt]); err != nil {
-						fmt.Println("write buf err:", err)
-						continue
-					}
-
-				}
-			}()
+			dealConn := NewConnection(conn, cid, CallBackToClient)
+			go dealConn.Start()
+			cid++
 		}
 	}()
 
