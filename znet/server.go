@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"zinx-copy/utils"
 	"zinx-copy/ziface"
 )
 
@@ -20,6 +21,9 @@ type Server struct {
 
 	// 服务器监听的端口
 	Port int
+
+	// router
+	Router ziface.IRouter
 }
 
 // CallBackToClient 当前回调是写死的，以后应该有用户自定义
@@ -36,16 +40,28 @@ func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
 func NewServer(name string) ziface.IServer {
 
 	return &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8999,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
+		Router:    nil,
 	}
 }
 
 // Start 启动服务器方法
 func (s Server) Start() {
-	fmt.Printf("[Start] Server Listenner at IP:%s, Port:%d, is starting\n", s.IP, s.Port)
+	fmt.Printf(
+		"[zinx] Server Name: %s, Listenner at IP:%s, Port:%d, is starting\n",
+		utils.GlobalObject.Name,
+		utils.GlobalObject.Host,
+		utils.GlobalObject.TcpPort)
+	fmt.Printf(
+		"[zinx] Version %s, MaxConn %d, MaxPackageSize: %d\n",
+		utils.GlobalObject.Version,
+		utils.GlobalObject.MaxConn,
+		utils.GlobalObject.MaxPackageSize,
+	)
+
 	// 1、 获取TCP的Addr
 	go func() {
 		TCPaddr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
@@ -69,7 +85,7 @@ func (s Server) Start() {
 				fmt.Println("Accept err:", err)
 				continue
 			}
-			dealConn := NewConnection(conn, cid, CallBackToClient)
+			dealConn := NewConnection(conn, cid, s.Router)
 			go dealConn.Start()
 			cid++
 		}
@@ -88,5 +104,11 @@ func (s Server) Serve() {
 	s.Start()
 
 	select {}
+
+}
+
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
+	fmt.Println("Add Router Succ!! ")
 
 }

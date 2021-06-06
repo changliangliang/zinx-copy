@@ -3,6 +3,7 @@ package znet
 import (
 	"fmt"
 	"net"
+	"zinx-copy/utils"
 	"zinx-copy/ziface"
 )
 
@@ -16,9 +17,9 @@ type Connection struct {
 
 	isClosed bool
 
-	handleApi ziface.HandleFunc
-
 	ExitChan chan bool
+
+	Router ziface.IRouter
 }
 
 // StartReader 链接读业务方法
@@ -29,17 +30,28 @@ func (c *Connection) StartReader() {
 
 	for {
 		// 读取客户端数据到buf中
-		buf := make([]byte, 512)
+		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
 		read, err := c.Conn.Read(buf)
 		if err != nil {
 			fmt.Println("recv buf err", err)
 			continue
 		}
 
-		// 调用当前链接绑定的HandleApi
-		if err := c.handleApi(c.Conn, buf, read); err != nil {
-			fmt.Println("ConnID", c.ConnID, "handle is error", err)
+		// 得到Request
+		req := &Request{
+			conn: c,
+			data: buf[0:read],
 		}
+
+		go func() {
+
+			// 从路由中找到对应的router
+			c.Router.PreHandle(req)
+			c.Router.Handle(req)
+			c.Router.PostHandle(req)
+
+		}()
+
 	}
 }
 
@@ -92,13 +104,13 @@ func (c *Connection) Send(data []byte) error {
 }
 
 // NewConnection 构造Connection
-func NewConnection(conn *net.TCPConn, connID uint32, callBackApi ziface.HandleFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Connection {
 	c := &Connection{
-		Conn:      conn,
-		ConnID:    connID,
-		handleApi: callBackApi,
-		isClosed:  false,
-		ExitChan:  make(chan bool, 1),
+		Conn:     conn,
+		ConnID:   connID,
+		isClosed: false,
+		Router:   router,
+		ExitChan: make(chan bool, 1),
 	}
 	return c
 }
