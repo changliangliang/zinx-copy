@@ -1,7 +1,6 @@
 package znet
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"zinx-copy/utils"
@@ -23,28 +22,16 @@ type Server struct {
 	Port int
 
 	// router
-	Router ziface.IRouter
-}
-
-// CallBackToClient 当前回调是写死的，以后应该有用户自定义
-func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
-	fmt.Println("[Conn Handle] CallBackToClient...]")
-	if _, err := conn.Write(data[0:len]); err != nil {
-		fmt.Println("write back buf err:", err)
-		return errors.New("CallBackToClient error")
-	}
-	return nil
-
+	MsgHandle ziface.IMsgHandle
 }
 
 func NewServer(name string) ziface.IServer {
-
 	return &Server{
 		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
 		IP:        utils.GlobalObject.Host,
 		Port:      utils.GlobalObject.TcpPort,
-		Router:    nil,
+		MsgHandle: NewMsgHandle(),
 	}
 }
 
@@ -85,7 +72,7 @@ func (s Server) Start() {
 				fmt.Println("Accept err:", err)
 				continue
 			}
-			dealConn := NewConnection(conn, cid, s.Router)
+			dealConn := NewConnection(conn, cid, s.MsgHandle)
 			go dealConn.Start()
 			cid++
 		}
@@ -107,8 +94,8 @@ func (s Server) Serve() {
 
 }
 
-func (s *Server) AddRouter(router ziface.IRouter) {
-	s.Router = router
+func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
+	s.MsgHandle.AddRouter(msgID, router)
 	fmt.Println("Add Router Succ!! ")
 
 }

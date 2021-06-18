@@ -1,9 +1,10 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
-	"zinx-copy/utils"
 	"zinx-copy/ziface"
 )
 
@@ -19,7 +20,7 @@ type Connection struct {
 
 	ExitChan chan bool
 
-	Router ziface.IRouter
+	MsgHandle ziface.IMsgHandle
 }
 
 // StartReader 链接读业务方法
@@ -29,30 +30,70 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 
 	for {
-		// 读取客户端数据到buf中
-		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
-		read, err := c.Conn.Read(buf)
+		// 创建一个拆包解包对象
+		dp := NewDataPack()
+
+		// 读取客户端 Msg Head 二进制流 8个字节
+		headData := make([]byte, dp.GetHeadLen())
+		if _, err := io.ReadFull(c.GetTCPConnection(), headData); err != nil {
+			fmt.Println("read msg head error:", err)
+			break
+		}
+
+		// 拆包得到msgID和 msgDataLen 放在msg中
+		msg, err := dp.Unpack(headData)
 		if err != nil {
-			fmt.Println("recv buf err", err)
-			continue
+			fmt.Println("unpack error:", err)
+			break
+		}
+
+		// 根据datalen 再次读取data
+		var data []byte
+		if msg.GetDataLen() > 0 {
+			data = make([]byte, msg.GetDataLen())
+			if _, err = io.ReadFull(c.GetTCPConnection(), data); err != nil {
+				fmt.Println("read msg data error:", err)
+				break
+			}
+			msg.SetData(data)
 		}
 
 		// 得到Request
 		req := &Request{
 			conn: c,
-			data: buf[0:read],
+			msg:  msg,
 		}
 
+		// 处理请求
 		go func() {
 
 			// 从路由中找到对应的router
-			c.Router.PreHandle(req)
-			c.Router.Handle(req)
-			c.Router.PostHandle(req)
+			c.MsgHandle.DoMsgHandle(req)
 
 		}()
 
 	}
+}
+
+// SendMsg 发送消息方法
+func (c *Connection) SendMsg(msgID uint32, data []byte) error {
+	if c.isClosed == true {
+		return errors.New("Connection closed when send msg")
+	}
+	// 将data进行封包
+	dp := NewDataPack()
+	msg, err := dp.Pack(NewMessage(msgID, data))
+	if err != nil {
+		fmt.Println("Pack msg error:", err)
+		return err
+	}
+	if _, err := c.GetTCPConnection().Write(msg); err != nil {
+		fmt.Println("Write msg id", msgID, "error:", err)
+		return err
+	}
+
+	return nil
+
 }
 
 // Start 启动链接
@@ -104,13 +145,13 @@ func (c *Connection) Send(data []byte) error {
 }
 
 // NewConnection 构造Connection
-func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, msgHandle ziface.IMsgHandle) *Connection {
 	c := &Connection{
-		Conn:     conn,
-		ConnID:   connID,
-		isClosed: false,
-		Router:   router,
-		ExitChan: make(chan bool, 1),
+		Conn:      conn,
+		ConnID:    connID,
+		isClosed:  false,
+		MsgHandle: msgHandle,
+		ExitChan:  make(chan bool, 1),
 	}
 	return c
 }

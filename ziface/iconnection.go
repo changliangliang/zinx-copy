@@ -21,8 +21,8 @@ type IConnection interface {
 	// RemoteAddr 获取远程客户端TCP状态
 	RemoteAddr() net.Addr
 
-	// Send 发送数据
-	Send([]byte) error
+	// SendMsg 发送数据
+	SendMsg(msgID uint32, data []byte) error
 }
 
 // HandleFunc 处理业务的方法

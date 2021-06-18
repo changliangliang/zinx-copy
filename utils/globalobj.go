@@ -2,7 +2,9 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"zinx-copy/ziface"
 )
 
@@ -49,6 +51,7 @@ var GlobalObject *GlobalObj
 
 func init() {
 	// 默认配置
+	fmt.Println(os.Getwd())
 	GlobalObject = &GlobalObj{
 		Name:           "ZinxServer",
 		Version:        "v0.4",

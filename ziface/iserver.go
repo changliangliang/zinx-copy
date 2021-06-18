@@ -13,5 +13,5 @@ type IServer interface {
 	Serve()
 
 	//AddRouter 添加router
-	AddRouter(router IRouter)
+	AddRouter(msgID uint32, router IRouter)
 }
