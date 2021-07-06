@@ -6,6 +6,9 @@ func main() {
 
 	go server()
 	time.Sleep(2 * time.Second)
-	go client()
+	for i := 0; i < 1000; i++ {
+		go client()
+	}
+
 	select {}
 }

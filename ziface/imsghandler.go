@@ -7,4 +7,8 @@ type IMsgHandle interface {
 	AddRouter(msgId uint32, router IRouter)
 	// DoMsgHandle 调度执行消息对应的处理器
 	DoMsgHandle(request IRequest)
+
+	StartWorkerPool()
+
+	SendMsgToTaskQueue(request IRequest)
 }

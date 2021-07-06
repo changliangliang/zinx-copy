@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"zinx-copy/utils"
 	"zinx-copy/ziface"
 )
 
 // Connection 链接
 type Connection struct {
+
+	// 当前Connection隶属的Server
+	Server ziface.IServer
 
 	// 当前连接的socket
 	Conn *net.TCPConn
@@ -20,12 +24,15 @@ type Connection struct {
 
 	ExitChan chan bool
 
+	// 用于读写goroutine之间的通信
+	msgChan chan []byte
+
 	MsgHandle ziface.IMsgHandle
 }
 
 // StartReader 链接读业务方法
 func (c *Connection) StartReader() {
-	fmt.Println("Reader Goroutine is running...")
+	fmt.Println("[Reader Goroutine is running]")
 	defer fmt.Println("connID=", c.ConnID, "Reader is exit, remote addr is", c.RemoteAddr().String())
 	defer c.Stop()
 
@@ -64,13 +71,14 @@ func (c *Connection) StartReader() {
 			msg:  msg,
 		}
 
-		// 处理请求
-		go func() {
+		if utils.GlobalObject.WorkerPoolSize > 0 {
+			c.MsgHandle.SendMsgToTaskQueue(req)
 
-			// 从路由中找到对应的router
-			c.MsgHandle.DoMsgHandle(req)
+		} else {
+			// 处理请求
+			go c.MsgHandle.DoMsgHandle(req)
 
-		}()
+		}
 
 	}
 }
@@ -87,10 +95,7 @@ func (c *Connection) SendMsg(msgID uint32, data []byte) error {
 		fmt.Println("Pack msg error:", err)
 		return err
 	}
-	if _, err := c.GetTCPConnection().Write(msg); err != nil {
-		fmt.Println("Write msg id", msgID, "error:", err)
-		return err
-	}
+	c.msgChan <- msg
 
 	return nil
 
@@ -99,8 +104,12 @@ func (c *Connection) SendMsg(msgID uint32, data []byte) error {
 // Start 启动链接
 func (c *Connection) Start() {
 	fmt.Println("Conn Start().. ConnID=", c.ConnID)
-	// 启动从当前链接读数据的业务
+
+	// 启动读业务
 	go c.StartReader()
+
+	// 启动写业务
+	go c.StartWriter()
 }
 
 // Stop 关闭链接
@@ -121,7 +130,13 @@ func (c *Connection) Stop() {
 		fmt.Println("Conn close error:", err)
 		return
 	}
+
+	c.ExitChan <- true
+
+	c.Server.GetConnManager().Remove(c)
+
 	close(c.ExitChan)
+	close(c.msgChan)
 	fmt.Println("Conn has closed")
 }
 
@@ -140,18 +155,40 @@ func (c *Connection) RemoteAddr() net.Addr {
 	return c.Conn.RemoteAddr()
 }
 
-func (c *Connection) Send(data []byte) error {
-	panic("implement me")
+// StartWriter 写消息的goroutine, 专门给客户端发送消息
+func (c *Connection) StartWriter() {
+	fmt.Println("[writer Goroutine is running]")
+	defer fmt.Println(c.RemoteAddr().String(), "[con Writer exit!]")
+
+	for {
+		select {
+		case data := <-c.msgChan:
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("Send data error", err)
+				return
+			}
+		case <-c.ExitChan:
+			// 代表reader退出
+			return
+
+		}
+	}
+
 }
 
 // NewConnection 构造Connection
-func NewConnection(conn *net.TCPConn, connID uint32, msgHandle ziface.IMsgHandle) *Connection {
+func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgHandle ziface.IMsgHandle) *Connection {
 	c := &Connection{
+		Server:    server,
 		Conn:      conn,
 		ConnID:    connID,
 		isClosed:  false,
 		MsgHandle: msgHandle,
+		msgChan:   make(chan []byte),
 		ExitChan:  make(chan bool, 1),
 	}
+
+	c.Server.GetConnManager().Add(c)
+
 	return c
 }

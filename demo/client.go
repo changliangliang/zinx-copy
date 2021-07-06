@@ -21,7 +21,7 @@ func client() {
 
 		// 发送分包消息
 		dp := znet.NewDataPack()
-		binaryMsg, err := dp.Pack(znet.NewMessage(0, []byte("Zinxv0.5 client Test Message....")))
+		binaryMsg, err := dp.Pack(znet.NewMessage(1, []byte("Zinxv0.5 client Test Message....")))
 		if err != nil {
 			fmt.Println("Pack error:", err)
 			break

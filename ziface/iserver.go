@@ -14,4 +14,7 @@ type IServer interface {
 
 	//AddRouter 添加router
 	AddRouter(msgID uint32, router IRouter)
+
+	//GetConnManager 获得链接管理器
+	GetConnManager() IConnManager
 }

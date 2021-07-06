@@ -32,6 +32,12 @@ type GlobalObj struct {
 
 	// 数据包最大值
 	MaxPackageSize uint32
+
+	// WorkerPoolSize
+	WorkerPoolSize uint32
+
+	// 允许开辟的Worker数量
+	MaxWorkerTaskLen uint32
 }
 
 // Reload 从配置文件中加载用户自定义的配置
@@ -53,15 +59,17 @@ func init() {
 	// 默认配置
 	fmt.Println(os.Getwd())
 	GlobalObject = &GlobalObj{
-		Name:           "ZinxServer",
-		Version:        "v0.4",
-		TcpPort:        8999,
-		Host:           "0.0.0.0",
-		MaxConn:        1000,
-		MaxPackageSize: 4096,
+		Name:             "ZinxServer",
+		Version:          "v0.4",
+		TcpPort:          8999,
+		Host:             "0.0.0.0",
+		MaxConn:          1000,
+		MaxPackageSize:   4096,
+		WorkerPoolSize:   10,
+		MaxWorkerTaskLen: 1024,
 	}
 
-	// 应该从配置文件中加载用户配置
-	GlobalObject.Reload()
+	//// 应该从配置文件中加载用户配置
+	//GlobalObject.Reload()
 
 }

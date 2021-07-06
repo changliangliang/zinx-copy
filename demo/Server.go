@@ -37,7 +37,7 @@ func server() {
 
 	server := znet.NewServer("[zinx_v_0.3]")
 
-	server.AddRouter(&PingRouter{})
+	server.AddRouter(1, &PingRouter{})
 
 	server.Serve()
 
