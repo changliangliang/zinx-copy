@@ -26,6 +26,12 @@ type Server struct {
 
 	// 链接管理器
 	ConnManager ziface.IConnManager
+
+	// Server创建链接之后调用的函数
+	OnConnStart func(conn ziface.IConnection)
+
+	// Server销毁链接后调用的函数
+	OnConnStop func(conn ziface.IConnection)
 }
 
 func NewServer(name string) ziface.IServer {
@@ -119,5 +125,29 @@ func (s *Server) GetConnManager() ziface.IConnManager {
 func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
 	s.MsgHandle.AddRouter(msgID, router)
 	fmt.Println("Add Router Succ!! ")
+
+}
+
+func (s *Server) SetOnConnStart(f func(conn ziface.IConnection)) {
+	s.OnConnStart = f
+}
+
+func (s *Server) SetOnConnStop(f func(conn ziface.IConnection)) {
+	s.OnConnStop = f
+}
+
+func (s *Server) CallOnConnStart(conn ziface.IConnection) {
+	if s.OnConnStart != nil {
+		fmt.Println("Call OnConnStart()")
+		s.OnConnStart(conn)
+	}
+
+}
+
+func (s *Server) CallOnConnStop(conn ziface.IConnection) {
+	if s.OnConnStop != nil {
+		fmt.Println("Call OnConnStop()")
+		s.OnConnStop(conn)
+	}
 
 }

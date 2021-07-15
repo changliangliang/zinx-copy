@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"zinx-copy/utils"
 	"zinx-copy/ziface"
 )
@@ -28,6 +29,12 @@ type Connection struct {
 	msgChan chan []byte
 
 	MsgHandle ziface.IMsgHandle
+
+	// 链接属性集合
+	property map[string]interface{}
+
+	// 保护属性的锁
+	propertyLock sync.RWMutex
 }
 
 // StartReader 链接读业务方法
@@ -103,6 +110,7 @@ func (c *Connection) SendMsg(msgID uint32, data []byte) error {
 
 // Start 启动链接
 func (c *Connection) Start() {
+
 	fmt.Println("Conn Start().. ConnID=", c.ConnID)
 
 	// 启动读业务
@@ -110,6 +118,8 @@ func (c *Connection) Start() {
 
 	// 启动写业务
 	go c.StartWriter()
+
+	c.Server.CallOnConnStart(c)
 }
 
 // Stop 关闭链接
@@ -124,6 +134,9 @@ func (c *Connection) Stop() {
 
 	c.isClosed = false
 
+	// 调用开发者注册的钩子函数
+	c.Server.CallOnConnStop(c)
+
 	// 回收资源
 	err := c.Conn.Close()
 	if err != nil {
@@ -131,8 +144,8 @@ func (c *Connection) Stop() {
 		return
 	}
 
+	// 告诉Writer关闭了
 	c.ExitChan <- true
-
 	c.Server.GetConnManager().Remove(c)
 
 	close(c.ExitChan)
@@ -191,4 +204,26 @@ func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgH
 	c.Server.GetConnManager().Add(c)
 
 	return c
+}
+
+func (c *Connection) SetProperty(key string, property interface{}) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+	c.property[key] = property
+
+}
+
+func (c *Connection) GetProperty(key string) (interface{}, error) {
+	c.propertyLock.RLock()
+	defer c.propertyLock.RUnlock()
+	if property, ok := c.property[key]; ok {
+		return property, nil
+	}
+	return nil, errors.New("属性不存在")
+}
+
+func (c *Connection) RemoveProperty(key string) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+	delete(c.property, key)
 }
